@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ผู้พิทักษ์จักรวาลนีออน - เกมอาร์เคดยิงอุกกาบาต</title>
+    <!-- โหลด Tailwind CSS และฟอนต์ภาษาไทย Kanit / Prompt -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050510;
+            color: #ffffff;
+            font-family: 'Kanit', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* เอฟเฟกต์เรืองแสงนีออน */
+        .neon-text-cyan {
+            text-shadow: 0 0 5px #00f3ff, 0 0 15px #00f3ff, 0 0 30px #0088ff;
+        }
+        .neon-text-pink {
+            text-shadow: 0 0 5px #ff007f, 0 0 15px #ff007f, 0 0 30px #aa00ff;
+        }
+        .neon-text-yellow {
+            text-shadow: 0 0 5px #ffee00, 0 0 15px #ffaa00;
+        }
+
+        .neon-box {
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3), inset 0 0 15px rgba(0, 243, 255, 0.2);
+            border: 1px solid rgba(0, 243, 255, 0.5);
+            backdrop-filter: blur(8px);
+        }
+
+        .btn-neon {
+            background: linear-gradient(135deg, #00f3ff 0%, #0066ff 100%);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.6), 0 4px 15px rgba(0, 0, 0, 0.5);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .btn-neon:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.9), 0 6px 20px rgba(0, 0, 0, 0.6);
+        }
+        .btn-neon:active {
+            transform: scale(0.95);
+        }
+
+        .btn-pink {
+            background: linear-gradient(135deg, #ff007f 0%, #7f00ff 100%);
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.6), 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        .btn-pink:hover {
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.9);
+        }
+
+        #game-container {
+            position: relative;
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* แอนิเมชันลอยตัว */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ส่วนหัวแสดงสถานะ (HUD) -->
+    <header class="w-full px-4 py-2 bg-slate-950/80 border-b border-cyan-500/30 flex flex-wrap items-center justify-between z-20 gap-2">
+        <div class="flex items-center gap-4">
+            <!-- พลังชีวิต -->
+            <div class="flex items-center gap-1.5" id="lives-container" title="พลังชีวิต">
+                <!-- ไอคอนหัวใจจะถูกสร้างด้วย JS -->
+            </div>
+            <!-- ระดับด่าน -->
+            <div class="px-3 py-1 rounded-full bg-purple-950/60 border border-purple-500/50 text-xs sm:text-sm font-semibold text-purple-300">
+                ด่านที่ <span id="level-display" class="text-white font-bold text-base">1</span>
+            </div>
+        </div>
+
+        <!-- คะแนน -->
+        <div class="flex items-center gap-4">
+            <div class="text-right">
+                <div class="text-[10px] sm:text-xs text-cyan-400 uppercase tracking-wider">คะแนนสูงสุด</div>
+                <div id="highscore-display" class="text-sm sm:text-base font-bold text-yellow-400 neon-text-yellow">0</div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] sm:text-xs text-cyan-400 uppercase tracking-wider">คะแนนปัจจุบัน</div>
+                <div id="score-display" class="text-lg sm:text-2xl font-extrabold text-white neon-text-cyan">0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- พื้นที่หลักของเกม -->
+    <main id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- หน้าจอเริ่มเกม (Start Screen) -->
+        <div id="start-screen" class="absolute inset-0 bg-slate-950/75 flex items-center justify-center p-4 z-30">
+            <div class="neon-box bg-slate-900/90 rounded-3xl p-6 sm:p-10 max-w-md w-full text-center relative overflow-hidden">
+                <!-- ไอคอนยานอวกาศ SVG ตกแต่ง -->
+                <div class="w-20 h-20 mx-auto mb-4 animate-float">
+                    <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-[0_0_15px_rgba(0,243,255,0.8)]">
+                        <polygon points="50,10 85,85 50,70 15,85" fill="#050510" stroke="#00f3ff" stroke-width="4" stroke-linejoin="round"/>
+                        <polygon points="50,25 65,65 50,58 35,65" fill="#00f3ff" opacity="0.6"/>
+                        <circle cx="50" cy="48" r="6" fill="#ff007f"/>
+                    </svg>
+                </div>
+
+                <h1 class="text-3xl sm:text-4xl font-extrabold text-white neon-text-cyan mb-2 tracking-wide">
+                    ผู้พิทักษ์จักรวาลนีออน
+                </h1>
+                <p class="text-cyan-200/80 text-sm sm:text-base mb-6">
+                    ทำลายฝูงอุกกาบาตและยานศัตรู เก็บไอเทมอัปเกรดอาวุธเพื่อเอาชีวิตรอด!
+                </p>
+
+                <!-- คำแนะนำการควบคุม -->
+                <div class="bg-slate-950/60 rounded-2xl p-4 mb-6 text-left text-xs sm:text-sm border border-slate-800 space-y-2">
+                    <div class="font-semibold text-cyan-400 mb-1">วิธีบังคับยาน:</div>
+                    <div class="flex items-center gap-2 text-slate-300">
+                        <span class="px-2 py-0.5 bg-slate-800 rounded text-cyan-300 font-mono">คอมพิวเตอร์</span>
+                        <span>ปุ่มลูกศร / WASD หรือเลื่อนเมาส์ (ยิงอัตโนมัติ)</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-slate-300">
+                        <span class="px-2 py-0.5 bg-slate-800 rounded text-pink-400 font-mono">มือถือ / แท็บเล็ต</span>
+                        <span>แตะและลากนิ้วบนหน้าจอเพื่อบังคับยาน</span>
+                    </div>
+                </div>
+
+                <button id="start-btn" class="btn-neon w-full py-4 rounded-2xl text-slate-950 font-extrabold text-lg sm:text-xl tracking-wider cursor-pointer">
+                    เริ่มภารกิจทันที
+                </button>
+            </div>
+        </div>
+
+        <!-- หน้าจอจบเกม (Game Over Screen) -->
+        <div id="gameover-screen" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-30">
+            <div class="neon-box bg-slate-900/95 rounded-3xl p-6 sm:p-10 max-w-md w-full text-center border-pink-500/50 shadow-[0_0_25px_rgba(255,0,127,0.3)]">
+                <h2 class="text-3xl sm:text-4xl font-extrabold text-pink-500 neon-text-pink mb-2">
+                    ภารกิจล้มเหลว!
+                </h2>
+                <p class="text-slate-300 text-sm sm:text-base mb-6">
+                    ยานของคุณถูกทำลายในสมรภูมิอวกาศ
+                </p>
+
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <div class="bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
+                        <div class="text-xs text-slate-400 mb-1">คะแนนที่ได้</div>
+                        <div id="final-score" class="text-2xl sm:text-3xl font-extrabold text-cyan-400 neon-text-cyan">0</div>
+                    </div>
+                    <div class="bg-slate-950/70 p-4 rounded-2xl border border-slate-800">
+                        <div class="text-xs text-slate-400 mb-1">ด่านที่ไปถึง</div>
+                        <div id="final-level" class="text-2xl sm:text-3xl font-extrabold text-purple-400">1</div>
+                    </div>
+                </div>
+
+                <div id="new-record-badge" class="hidden mb-6 py-2 px-4 rounded-full bg-yellow-500/20 border border-yellow-400 text-yellow-300 text-sm font-bold animate-bounce">
+                    🏆 ทำลายสถิติคะแนนสูงสุดใหม่!
+                </div>
+
+                <button id="restart-btn" class="btn-neon btn-pink w-full py-4 rounded-2xl text-white font-extrabold text-lg sm:text-xl tracking-wider cursor-pointer">
+                    เล่นใหม่อีกครั้ง
+                </button>
+            </div>
+        </div>
+
+        <!-- ข้อความแจ้งเตือนเลื่อนด่าน / เก็บไอเทม -->
+        <div id="floating-banner" class="pointer-events-none absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center opacity-0 transition-opacity duration-300 z-20">
+            <div id="banner-title" class="text-3xl sm:text-5xl font-extrabold text-yellow-300 neon-text-yellow tracking-wider">
+                ด่านที่ 2
+            </div>
+            <div id="banner-sub" class="text-sm sm:text-lg text-cyan-200 font-medium mt-1">
+                ความเร็วอุกกาบาตเพิ่มขึ้น!
+            </div>
+        </div>
+    </main>
+
+    <!-- แถบปุ่มควบคุมด้านล่างนอก Canvas -->
+    <footer class="w-full px-4 py-2 bg-slate-950/90 border-t border-cyan-500/20 flex items-center justify-center gap-3 z-20">
+        <button id="mute-btn" class="px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-xs sm:text-sm font-medium text-cyan-300 flex items-center gap-2 transition cursor-pointer">
+            <span id="mute-icon">🔊</span>
+            <span id="mute-text">เปิดเสียง</span>
+        </button>
+        <button id="pause-btn" class="hidden px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-600 text-xs sm:text-sm font-medium text-yellow-300 flex items-center gap-2 transition cursor-pointer">
+            <span id="pause-icon">⏸️</span>
+            <span id="pause-text">หยุดชั่วคราว</span>
+        </button>
+    </footer>
+
+    <script>
+        /**
+         * ระบบสังเคราะห์เสียงประกอบ (Web Audio API)
+         * สร้างเสียงเลเซอร์ เสียงระเบิด เสียงเก็บไอเทม และเสียงเลื่อนด่านโดยไม่พึ่งพาไฟล์ภายนอก
+         */
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            // เสียงยิงเลเซอร์
+            playShoot(weaponLevel = 1) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = weaponLevel > 1 ? 'sawtooth' : 'triangle';
+                    
+                    const baseFreq = weaponLevel > 1 ? 880 : 660;
+                    osc.frequency.setValueAtTime(baseFreq, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.12);
+
+                    gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.12);
+                } catch (e) {}
+            }
+
+            // เสียงระเบิด (ใช้ White Noise กรองความถี่ต่ำ)
+            playExplosion(size = 'medium') {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const duration = size === 'large' ? 0.5 : (size === 'small' ? 0.18 : 0.3);
+                    const bufferSize = this.ctx.sampleRate * duration;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(size === 'large' ? 400 : 800, this.ctx.currentTime);
+                    filter.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + duration);
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(size === 'large' ? 0.35 : 0.2, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start();
+                } catch (e) {}
+            }
+
+            // เสียงเก็บไอเทมเพิ่มพลัง
+            playPowerup() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+
+                    const now = this.ctx.currentTime;
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(554.37, now + 0.07);
+                    osc.frequency.setValueAtTime(659.25, now + 0.14);
+                    osc.frequency.setValueAtTime(880, now + 0.21);
+
+                    gain.gain.setValueAtTime(0.18, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(now + 0.35);
+                } catch (e) {}
+            }
+
+            // เสียงยานได้รับความเสียหาย
+            playDamage() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+
+                    const now = this.ctx.currentTime;
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.linearRampToValueAtTime(60, now + 0.3);
+
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(now + 0.3);
+                } catch (e) {}
+            }
+
+            // เสียงผ่านด่าน
+            playLevelUp() {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        const startTime = this.ctx.currentTime + idx * 0.1;
+                        osc.frequency.setValueAtTime(freq, startTime);
+                        gain.gain.setValueAtTime(0.15, startTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.25);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(startTime);
+                        osc.stop(startTime + 0.25);
+                    });
+                } catch (e) {}
+            }
+        }
+
+        /**
+         * คลาสหลักสำหรับควบคุมเกมยานอวกาศยิงอุกกาบาต
+         */
+        class SpaceShooterGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.container = document.getElementById('game-container');
+                this.sfx = new SoundEffects();
+
+                // สถานะเกม
+                this.state = 'MENU'; // MENU, PLAYING, PAUSED, GAMEOVER
+                this.score = 0;
+                this.highScore = parseInt(localStorage.getItem('neonSpaceHighScore')) || 0;
+                this.level = 1;
+                this.lives = 3;
+                this.maxLives = 5;
+
+                // เอฟเฟกต์หน้าจอสั่น
+                this.shakeTime = 0;
+                this.shakeIntensity = 0;
+
+                // ออบเจกต์ในเกม
+                this.player = null;
+                this.bullets = [];
+                this.asteroids = [];
+                this.enemies = [];
+                this.enemyBullets = [];
+                this.particles = [];
+                this.powerups = [];
+                this.stars = [];
+
+                // ตัวจับเวลาการเกิดศัตรู
+                this.asteroidTimer = 0;
+                this.enemyTimer = 0;
+                this.lastTime = 0;
+
+                // การควบคุม
+                this.keys = {};
+                this.pointer = { active: false, x: 0, y: 0 };
+
+                this.initUI();
+                this.resize();
+                this.initStars();
+                this.bindEvents();
+
+                // เริ่มลูปแอนิเมชันพื้นหลัง
+                requestAnimationFrame((t) => this.loop(t));
+            }
+
+            initUI() {
+                document.getElementById('highscore-display').textContent = this.highScore.toLocaleString();
+                this.updateLivesUI();
+            }
+
+            resize() {
+                const rect = this.container.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+
+                if (this.player) {
+                    this.player.x = Math.max(this.player.radius, Math.min(this.canvas.width - this.player.radius, this.player.x));
+                    this.player.y = Math.max(this.player.radius, Math.min(this.canvas.height - this.player.radius, this.player.y));
+                }
+            }
+
+            initStars() {
+                this.stars = [];
+                const starCount = Math.floor((this.canvas.width * this.canvas.height) / 8000);
+                for (let i = 0; i < starCount; i++) {
+                    this.stars.push({
+                        x: Math.random() * this.canvas.width,
+                        y: Math.random() * this.canvas.height,
+                        size: Math.random() * 2 + 0.5,
+                        speed: Math.random() * 60 + 20,
+                        alpha: Math.random() * 0.8 + 0.2
+                    });
+                }
+            }
+
+            bindEvents() {
+                window.addEventListener('resize', () => {
+                    this.resize();
+                    this.initStars();
+                });
+
+                // ปุ่มเริ่มเกมและเล่นใหม่
+                document.getElementById('start-btn').addEventListener('click', () => {
+                    this.sfx.init();
+                    this.startNewGame();
+                });
+
+                document.getElementById('restart-btn').addEventListener('click', () => {
+                    this.sfx.init();
+                    this.startNewGame();
+                });
+
+                // ปุ่มปิด/เปิดเสียง
+                document.getElementById('mute-btn').addEventListener('click', () => {
+                    this.sfx.init();
+                    const isMuted = this.sfx.toggleMute();
+                    document.getElementById('mute-icon').textContent = isMuted ? '🔇' : '🔊';
+                    document.getElementById('mute-text').textContent = isMuted ? 'ปิดเสียงอยู่' : 'เปิดเสียง';
+                });
+
+                // ปุ่มหยุดชั่วคราว
+                document.getElementById('pause-btn').addEventListener('click', () => {
+                    if (this.state === 'PLAYING') {
+                        this.state = 'PAUSED';
+                        document.getElementById('pause-icon').textContent = '▶️';
+                        document.getElementById('pause-text').textContent = 'เล่นต่อ';
+                        this.showBanner('หยุดเกมชั่วคราว', 'กดปุ่มเล่นต่อเพื่อลุยกันต่อ');
+                    } else if (this.state === 'PAUSED') {
+                        this.state = 'PLAYING';
+                        this.lastTime = performance.now();
+                        document.getElementById('pause-icon').textContent = '⏸️';
+                        document.getElementById('pause-text').textContent = 'หยุดชั่วคราว';
+                        this.hideBanner();
+                    }
+                });
+
+                // คีย์บอร์ด
+                window.addEventListener('keydown', (e) => {
+                    this.keys[e.code] = true;
+                    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                        e.preventDefault();
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    this.keys[e.code] = false;
+                });
+
+                // เมาส์และหน้าจอสัมผัส (Touch)
+                const updatePointer = (clientX, clientY) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.pointer.x = clientX - rect.left;
+                    this.pointer.y = clientY - rect.top;
+                };
+
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (this.state !== 'PLAYING') return;
+                    this.pointer.active = true;
+                    updatePointer(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (this.state !== 'PLAYING' || !this.pointer.active) return;
+                    updatePointer(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mouseup', () => {
+                    this.pointer.active = false;
+                });
+
+                this.canvas.addEventListener('touchstart', (e) => {
+                    if (this.state !== 'PLAYING') return;
+                    e.preventDefault();
+                    this.pointer.active = true;
+                    const touch = e.touches[0];
+                    // ขยับยานให้อยู่เหนือจุดสัมผัสเล็กน้อยเพื่อไม่ให้นิ้วบังยาน
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.pointer.x = touch.clientX - rect.left;
+                    this.pointer.y = (touch.clientY - rect.top) - 45;
+                }, { passive: false });
+
+                this.canvas.addEventListener('touchmove', (e) => {
+                    if (this.state !== 'PLAYING' || !this.pointer.active) return;
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.pointer.x = touch.clientX - rect.left;
+                    this.pointer.y = (touch.clientY - rect.top) - 45;
+                }, { passive: false });
+
+                this.canvas.addEventListener('touchend', () => {
+                    this.pointer.active = false;
+                });
+            }
+
+            startNewGame() {
+                this.score = 0;
+                this.level = 1;
+                this.lives = 3;
+                this.bullets = [];
+                this.asteroids = [];
+                this.enemies = [];
+                this.enemyBullets = [];
+                this.particles = [];
+                this.powerups = [];
+                this.asteroidTimer = 0;
+                this.enemyTimer = 0;
+
+                this.player = {
+                    x: this.canvas.width / 2,
+                    y: this.canvas.height - 90,
+                    radius: 22,
+                    speed: 420,
+                    fireCooldown: 0,
+                    fireRate: 0.22,
+                    weaponLevel: 1,
+                    weaponTimer: 0,
+                    shield: false,
+                    invulnerable: 1.5
+                };
+
+                this.updateScoreUI();
+                this.updateLivesUI();
+                document.getElementById('level-display').textContent = this.level;
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('gameover-screen').classList.add('hidden');
+                document.getElementById('pause-btn').classList.remove('hidden');
+
+                this.state = 'PLAYING';
+                this.lastTime = performance.now();
+                this.triggerBanner(`ด่านที่ ${this.level}`, 'เตรียมพร้อมปะทะฝูงอุกกาบาต!');
+            }
+
+            triggerBanner(title, sub) {
+                const banner = document.getElementById('floating-banner');
+                document.getElementById('banner-title').textContent = title;
+                document.getElementById('banner-sub').textContent = sub;
+                banner.style.opacity = '1';
+
+                clearTimeout(this.bannerTimeout);
+                this.bannerTimeout = setTimeout(() => {
+                    if (this.state === 'PLAYING') {
+                        banner.style.opacity = '0';
+                    }
+                }, 2000);
+            }
+
+            hideBanner() {
+                document.getElementById('floating-banner').style.opacity = '0';
+            }
+
+            updateScoreUI() {
+                document.getElementById('score-display').textContent = this.score.toLocaleString();
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('neonSpaceHighScore', this.highScore);
+                    document.getElementById('highscore-display').textContent = this.highScore.toLocaleString();
+                }
+
+                // ตรวจสอบการเลื่อนด่านทุกๆ 1,000 คะแนน
+                const nextLevel = Math.floor(this.score / 1000) + 1;
+                if (nextLevel > this.level) {
+                    this.level = nextLevel;
+                    document.getElementById('level-display').textContent = this.level;
+                    this.sfx.playLevelUp();
+                    this.triggerBanner(`ด่านที่ ${this.level}`, 'ศัตรูแข็งแกร่งและรวดเร็วขึ้น!');
+                }
+            }
+
+            updateLivesUI() {
+                const container = document.getElementById('lives-container');
+                container.innerHTML = '';
+                for (let i = 0; i < this.maxLives; i++) {
+                    const active = i < this.lives;
+                    const heart = document.createElement('span');
+                    heart.innerHTML = `
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 transition-all duration-300 ${active ? 'text-pink-500 drop-shadow-[0_0_8px_rgba(255,0,127,0.8)] scale-100' : 'text-slate-700 scale-90'}" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                        </svg>
+                    `;
+                    container.appendChild(heart);
+                }
+            }
+
+            screenShake(intensity = 8, duration = 0.25) {
+                this.shakeIntensity = intensity;
+                this.shakeTime = duration;
+            }
+
+            createExplosion(x, y, color, count = 20, size = 'medium') {
+                this.sfx.playExplosion(size);
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 200 + 40;
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: Math.cos(angle) * speed,
+                        vy: Math.sin(angle) * speed,
+                        life: 1.0,
+                        decay: Math.random() * 1.5 + 1.0,
+                        size: Math.random() * 3.5 + 1.5,
+                        color: color
+                    });
+                }
+            }
+
+            spawnPowerup(x, y) {
+                // โอกาส 22% ที่จะดรอปไอเทมเมื่อทำลายอุกกาบาตหรือศัตรู
+                if (Math.random() > 0.22) return;
+
+                const types = [
+                    { type: 'WEAPON', color: '#00f3ff', label: 'W' }, // อัปเกรดปืน
+                    { type: 'SHIELD', color: '#00ff88', label: 'S' }, // โล่ป้องกัน
+                    { type: 'HEAL', color: '#ff007f', label: '+' }    // ฟื้นฟูพลังชีวิต
+                ];
+                const chosen = types[Math.floor(Math.random() * types.length)];
+
+                this.powerups.push({
+                    x: x,
+                    y: y,
+                    vy: 110,
+                    radius: 16,
+                    ...chosen
+                });
+            }
+
+            spawnAsteroid() {
+                const radius = Math.random() * 24 + 16;
+                const x = Math.random() * (this.canvas.width - radius * 2) + radius;
+                const speedMultiplier = 1 + (this.level - 1) * 0.15;
+                const vy = (Math.random() * 120 + 90) * speedMultiplier;
+                const vx = (Math.random() - 0.5) * 80;
+
+                // สร้างรูปทรงเหลี่ยมของอุกกาบาต
+                const vertices = [];
+                const numVertices = Math.floor(Math.random() * 5) + 7;
+                for (let i = 0; i < numVertices; i++) {
+                    const angle = (i / numVertices) * Math.PI * 2;
+                    const dist = radius * (0.75 + Math.random() * 0.35);
+                    vertices.push({ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist });
+                }
+
+                const hp = Math.ceil(radius / 14) + Math.floor(this.level / 3);
+                const colors = ['#ff007f', '#ff8800', '#aa00ff'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+
+                this.asteroids.push({
+                    x: x,
+                    y: -radius,
+                    vx: vx,
+                    vy: vy,
+                    radius: radius,
+                    rotation: 0,
+                    rotSpeed: (Math.random() - 0.5) * 3,
+                    vertices: vertices,
+                    hp: hp,
+                    maxHp: hp,
+                    color: color
+                });
+            }
+
+            spawnEnemy() {
+                const radius = 20;
+                const x = Math.random() * (this.canvas.width - 80) + 40;
+                const speedMultiplier = 1 + (this.level - 1) * 0.1;
+
+                this.enemies.push({
+                    x: x,
+                    y: -radius,
+                    vx: (Math.random() > 0.5 ? 1 : -1) * 100 * speedMultiplier,
+                    vy: 85 * speedMultiplier,
+                    radius: radius,
+                    hp: 2 + Math.floor(this.level / 2),
+                    fireTimer: Math.random() * 1.5 + 0.5
+                });
+            }
+
+            firePlayerWeapon() {
+                const p = this.player;
+                this.sfx.playShoot(p.weaponLevel);
+
+                if (p.weaponLevel === 1) {
+                    this.bullets.push({ x: p.x, y: p.y - p.radius, vx: 0, vy: -650, color: '#00f3ff', radius: 4 });
+                } else if (p.weaponLevel === 2) {
+                    this.bullets.push({ x: p.x - 10, y: p.y - p.radius + 5, vx: 0, vy: -680, color: '#00f3ff', radius: 4 });
+                    this.bullets.push({ x: p.x + 10, y: p.y - p.radius + 5, vx: 0, vy: -680, color: '#00f3ff', radius: 4 });
+                } else {
+                    // เลเวล 3: ยิงกระจาย 3 ทิศทาง
+                    this.bullets.push({ x: p.x, y: p.y - p.radius, vx: 0, vy: -700, color: '#ffee00', radius: 5 });
+                    this.bullets.push({ x: p.x - 12, y: p.y - p.radius + 5, vx: -110, vy: -680, color: '#00f3ff', radius: 4 });
+                    this.bullets.push({ x: p.x + 12, y: p.y - p.radius + 5, vx: 110, vy: -680, color: '#00f3ff', radius: 4 });
+                }
+            }
+
+            damagePlayer() {
+                const p = this.player;
+                if (p.invulnerable > 0) return;
+
+                if (p.shield) {
+                    p.shield = false;
+                    p.invulnerable = 1.0;
+                    this.sfx.playDamage();
+                    this.screenShake(6, 0.2);
+                    this.createExplosion(p.x, p.y, '#00ff88', 15, 'small');
+                    return;
+                }
+
+                this.lives--;
+                this.updateLivesUI();
+                this.sfx.playDamage();
+                this.screenShake(12, 0.35);
+                this.createExplosion(p.x, p.y, '#ff007f', 25, 'medium');
+
+                // ลดระดับอาวุธลง 1 ขั้นเมื่อถูกโจมตี
+                if (p.weaponLevel > 1) {
+                    p.weaponLevel--;
+                }
+
+                if (this.lives <= 0) {
+                    this.gameOver();
+                } else {
+                    p.invulnerable = 2.0;
+                }
+            }
+
+            gameOver() {
+                this.state = 'GAMEOVER';
+                this.createExplosion(this.player.x, this.player.y, '#00f3ff', 45, 'large');
+                document.getElementById('pause-btn').classList.add('hidden');
+                this.hideBanner();
+
+                document.getElementById('final-score').textContent = this.score.toLocaleString();
+                document.getElementById('final-level').textContent = this.level;
+
+                const recordBadge = document.getElementById('new-record-badge');
+                if (this.score > 0 && this.score >= this.highScore) {
+                    recordBadge.classList.remove('hidden');
+                } else {
+                    recordBadge.classList.add('hidden');
+                }
+
+                setTimeout(() => {
+                    document.getElementById('gameover-screen').classList.remove('hidden');
+                }, 600);
+            }
+
+            update(dt) {
+                // อัปเดตดาวพื้นหลังเสมอ
+                this.stars.forEach(star => {
+                    star.y += star.speed * dt * (this.state === 'PLAYING' ? (1 + this.level * 0.1) : 0.5);
+                    if (star.y > this.canvas.height) {
+                        star.y = 0;
+                        star.x = Math.random() * this.canvas.width;
+                    }
+                });
+
+                if (this.state !== 'PLAYING') return;
+
+                // อัปเดตหน้าจอสั่น
+                if (this.shakeTime > 0) {
+                    this.shakeTime -= dt;
+                }
+
+                const p = this.player;
+                if (p.invulnerable > 0) p.invulnerable -= dt;
+                if (p.weaponTimer > 0) {
+                    p.weaponTimer -= dt;
+                    if (p.weaponTimer <= 0 && p.weaponLevel > 1) {
+                        p.weaponLevel = 1;
+                    }
+                }
+
+                // การเคลื่อนที่ของผู้เล่น (คีย์บอร์ด)
+                let dx = 0;
+                let dy = 0;
+                if (this.keys['ArrowLeft'] || this.keys['KeyA']) dx -= 1;
+                if (this.keys['ArrowRight'] || this.keys['KeyD']) dx += 1;
+                if (this.keys['ArrowUp'] || this.keys['KeyW']) dy -= 1;
+                if (this.keys['ArrowDown'] || this.keys['KeyS']) dy += 1;
+
+                if (dx !== 0 || dy !== 0) {
+                    const len = Math.hypot(dx, dy);
+                    p.x += (dx / len) * p.speed * dt;
+                    p.y += (dy / len) * p.speed * dt;
+                } else if (this.pointer.active) {
+                    // เคลื่อนที่ตามเมาส์หรือนิ้วสัมผัสอย่างนุ่มนวล
+                    const diffX = this.pointer.x - p.x;
+                    const diffY = this.pointer.y - p.y;
+                    p.x += diffX * Math.min(1, dt * 15);
+                    p.y += diffY * Math.min(1, dt * 15);
+                }
+
+                // จำกัดขอบเขตยานไม่ให้ออกนอกจอ
+                p.x = Math.max(p.radius, Math.min(this.canvas.width - p.radius, p.x));
+                p.y = Math.max(p.radius, Math.min(this.canvas.height - p.radius, p.y));
+
+                // ระบบยิงอัตโนมัติ
+                p.fireCooldown -= dt;
+                if (p.fireCooldown <= 0) {
+                    this.firePlayerWeapon();
+                    p.fireCooldown = p.fireRate;
+                }
+
+                // อัปเดตกระสุนผู้เล่น
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    const b = this.bullets[i];
+                    b.x += b.vx * dt;
+                    b.y += b.vy * dt;
+                    if (b.y < -20 || b.x < -20 || b.x > this.canvas.width + 20) {
+                        this.bullets.splice(i, 1);
+                    }
+                }
+
+                // สร้างอุกกาบาตตามช่วงเวลา
+                const asteroidInterval = Math.max(0.35, 1.2 - (this.level - 1) * 0.08);
+                this.asteroidTimer -= dt;
+                if (this.asteroidTimer <= 0) {
+                    this.spawnAsteroid();
+                    this.asteroidTimer = asteroidInterval;
+                }
+
+                // สร้างยานศัตรูตั้งแต่ด่าน 2 เป็นต้นไป
+                if (this.level >= 2) {
+                    const enemyInterval = Math.max(1.8, 4.5 - (this.level - 2) * 0.3);
+                    this.enemyTimer -= dt;
+                    if (this.enemyTimer <= 0) {
+                        this.spawnEnemy();
+                        this.enemyTimer = enemyInterval;
+                    }
+                }
+
+                // อัปเดตอุกกาบาตและการชน
+                for (let i = this.asteroids.length - 1; i >= 0; i--) {
+                    const a = this.asteroids[i];
+                    a.x += a.vx * dt;
+                    a.y += a.vy * dt;
+                    a.rotation += a.rotSpeed * dt;
+
+                    // สะท้อนขอบซ้ายขวา
+                    if (a.x < a.radius || a.x > this.canvas.width - a.radius) {
+                        a.vx *= -1;
+                    }
+
+                    // ตรวจสอบกระสุนชนอุกกาบาต
+                    let destroyed = false;
+                    for (let j = this.bullets.length - 1; j >= 0; j--) {
+                        const b = this.bullets[j];
+                        if (Math.hypot(a.x - b.x, a.y - b.y) < a.radius + b.radius) {
+                            this.bullets.splice(j, 1);
+                            a.hp--;
+                            this.createExplosion(b.x, b.y, '#00f3ff', 4, 'small');
+
+                            if (a.hp <= 0) {
+                                this.score += Math.round(a.maxHp * 50);
+                                this.updateScoreUI();
+                                this.createExplosion(a.x, a.y, a.color, 18, a.radius > 30 ? 'large' : 'medium');
+                                this.spawnPowerup(a.x, a.y);
+                                this.asteroids.splice(i, 1);
+                                destroyed = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (destroyed) continue;
+
+                    // ตรวจสอบอุกกาบาตชนผู้เล่น
+                    if (Math.hypot(a.x - p.x, a.y - p.y) < a.radius + p.radius - 4) {
+                        this.createExplosion(a.x, a.y, a.color, 15, 'medium');
+                        this.asteroids.splice(i, 1);
+                        this.damagePlayer();
+                        continue;
+                    }
+
+                    if (a.y > this.canvas.height + a.radius + 20) {
+                        this.asteroids.splice(i, 1);
+                    }
+                }
+
+                // อัปเดตยานศัตรู
+                for (let i = this.enemies.length - 1; i >= 0; i--) {
+                    const e = this.enemies[i];
+                    e.x += e.vx * dt;
+                    e.y += e.vy * dt;
+
+                    if (e.x < e.radius + 10 || e.x > this.canvas.width - e.radius - 10) {
+                        e.vx *= -1;
+                    }
+
+                    // ศัตรูยิงกระสุน
+                    e.fireTimer -= dt;
+                    if (e.fireTimer <= 0 && e.y > 0 && e.y < this.canvas.height * 0.7) {
+                        const angle = Math.atan2(p.y - e.y, p.x - e.x);
+                        const bulletSpeed = 260 + this.level * 15;
+                        this.enemyBullets.push({
+                            x: e.x,
+                            y: e.y + e.radius,
+                            vx: Math.cos(angle) * bulletSpeed,
+                            vy: Math.sin(angle) * bulletSpeed,
+                            radius: 5
+                        });
+                        e.fireTimer = Math.max(1.2, 2.5 - this.level * 0.1);
+                    }
+
+                    // กระสุนผู้เล่นชนยานศัตรู
+                    let destroyed = false;
+                    for (let j = this.bullets.length - 1; j >= 0; j--) {
+                        const b = this.bullets[j];
+                        if (Math.hypot(e.x - b.x, e.y - b.y) < e.radius + b.radius) {
+                            this.bullets.splice(j, 1);
+                            e.hp--;
+                            this.createExplosion(b.x, b.y, '#ffee00', 5, 'small');
+                            if (e.hp <= 0) {
+                                this.score += 200;
+                                this.updateScoreUI();
+                                this.createExplosion(e.x, e.y, '#ff0055', 25, 'large');
+                                this.spawnPowerup(e.x, e.y);
+                                this.enemies.splice(i, 1);
+                                destroyed = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (destroyed) continue;
+
+                    // ชนผู้เล่น
+                    if (Math.hypot(e.x - p.x, e.y - p.y) < e.radius + p.radius) {
+                        this.createExplosion(e.x, e.y, '#ff0055', 20, 'medium');
+                        this.enemies.splice(i, 1);
+                        this.damagePlayer();
+                        continue;
+                    }
+
+                    if (e.y > this.canvas.height + 40) {
+                        this.enemies.splice(i, 1);
+                    }
+                }
+
+                // อัปเดตกระสุนศัตรู
+                for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+                    const eb = this.enemyBullets[i];
+                    eb.x += eb.vx * dt;
+                    eb.y += eb.vy * dt;
+
+                    if (Math.hypot(eb.x - p.x, eb.y - p.y) < eb.radius + p.radius - 4) {
+                        this.enemyBullets.splice(i, 1);
+                        this.damagePlayer();
+                        continue;
+                    }
+
+                    if (eb.y > this.canvas.height + 20 || eb.x < -20 || eb.x > this.canvas.width + 20) {
+                        this.enemyBullets.splice(i, 1);
+                    }
+                }
+
+                // อัปเดตไอเทมอัปเกรด
+                for (let i = this.powerups.length - 1; i >= 0; i--) {
+                    const pw = this.powerups[i];
+                    pw.y += pw.vy * dt;
+
+                    if (Math.hypot(pw.x - p.x, pw.y - p.y) < pw.radius + p.radius) {
+                        this.sfx.playPowerup();
+                        this.score += 100;
+                        this.updateScoreUI();
+
+                        if (pw.type === 'WEAPON') {
+                            p.weaponLevel = Math.min(3, p.weaponLevel + 1);
+                            p.weaponTimer = 12; // อัปเกรดปืนนาน 12 วินาที
+                            this.triggerBanner('อัปเกรดปืนเลเซอร์!', `พลังทำลายระดับ ${p.weaponLevel}`);
+                        } else if (pw.type === 'SHIELD') {
+                            p.shield = true;
+                            this.triggerBanner('เปิดใช้งานโล่พลังงาน!', 'ป้องกันความเสียหายได้ 1 ครั้ง');
+                        } else if (pw.type === 'HEAL') {
+                            if (this.lives < this.maxLives) {
+                                this.lives++;
+                                this.updateLivesUI();
+                                this.triggerBanner('ซ่อมแซมยานสำเร็จ!', 'ได้รับพลังชีวิต +1');
+                            } else {
+                                this.score += 300;
+                                this.updateScoreUI();
+                                this.triggerBanner('พลังชีวิตเต็มแล้ว!', 'รับโบนัสพิเศษ +300 คะแนน');
+                            }
+                        }
+
+                        this.powerups.splice(i, 1);
+                        continue;
+                    }
+
+                    if (pw.y > this.canvas.height + 30) {
+                        this.powerups.splice(i, 1);
+                    }
+                }
+
+                // อัปเดตอนุภาคระเบิด
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const pt = this.particles[i];
+                    pt.x += pt.vx * dt;
+                    pt.y += pt.vy * dt;
+                    pt.life -= pt.decay * dt;
+                    if (pt.life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            draw() {
+                const ctx = this.ctx;
+                ctx.save();
+
+                // พื้นหลังอวกาศสีเข้ม
+                ctx.fillStyle = '#050510';
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // เอฟเฟกต์หน้าจอสั่น
+                if (this.shakeTime > 0 && this.state === 'PLAYING') {
+                    const sx = (Math.random() - 0.5) * this.shakeIntensity;
+                    const sy = (Math.random() - 0.5) * this.shakeIntensity;
+                    ctx.translate(sx, sy);
+                }
+
+                // วาดดวงดาวระยิบระยับ
+                this.stars.forEach(star => {
+                    ctx.fillStyle = `rgba(180, 230, 255, ${star.alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                if (this.state === 'MENU') {
+                    ctx.restore();
+                    return;
+                }
+
+                // วาดไอเทมอัปเกรด
+                this.powerups.forEach(pw => {
+                    ctx.save();
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = pw.color;
+                    ctx.strokeStyle = pw.color;
+                    ctx.lineWidth = 2.5;
+                    ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
+
+                    ctx.beginPath();
+                    ctx.arc(pw.x, pw.y, pw.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = pw.color;
+                    ctx.font = 'bold 14px Kanit, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(pw.label, pw.x, pw.y + 1);
+                    ctx.restore();
+                });
+
+                // วาดกระสุนผู้เล่น
+                this.bullets.forEach(b => {
+                    ctx.save();
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = b.color;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.roundRect(b.x - b.radius / 2, b.y - 10, b.radius, 18, 3);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // วาดกระสุนศัตรู
+                this.enemyBullets.forEach(eb => {
+                    ctx.save();
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#ff2a55';
+                    ctx.fillStyle = '#ff2a55';
+                    ctx.beginPath();
+                    ctx.arc(eb.x, eb.y, eb.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // วาดอุกกาบาตนีออน
+                this.asteroids.forEach(a => {
+                    ctx.save();
+                    ctx.translate(a.x, a.y);
+                    ctx.rotate(a.rotation);
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = a.color;
+                    ctx.strokeStyle = a.color;
+                    ctx.lineWidth = 2.5;
+                    ctx.fillStyle = 'rgba(15, 10, 25, 0.8)';
+
+                    ctx.beginPath();
+                    a.vertices.forEach((v, idx) => {
+                        if (idx === 0) ctx.moveTo(v.x, v.y);
+                        else ctx.lineTo(v.x, v.y);
+                    });
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+                // วาดยานศัตรู
+                this.enemies.forEach(e => {
+                    ctx.save();
+                    ctx.translate(e.x, e.y);
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = '#ff0055';
+                    ctx.strokeStyle = '#ff0055';
+                    ctx.lineWidth = 2.5;
+                    ctx.fillStyle = '#1a0510';
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, e.radius);
+                    ctx.lineTo(e.radius, -e.radius * 0.7);
+                    ctx.lineTo(0, -e.radius * 0.3);
+                    ctx.lineTo(-e.radius, -e.radius * 0.7);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // แกนพลังงานศัตรู
+                    ctx.fillStyle = '#ffee00';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // วาดยานอวกาศของผู้เล่น
+                if (this.player && this.lives > 0) {
+                    const p = this.player;
+                    // เอฟเฟกต์กระพริบช่วงอมตะ
+                    if (p.invulnerable <= 0 || Math.floor(p.invulnerable * 15) % 2 === 0) {
+                        ctx.save();
+                        ctx.translate(p.x, p.y);
+
+                        // เปลวไฟไอพ่นท้ายยาน
+                        const flameHeight = Math.random() * 12 + 12;
+                        ctx.fillStyle = '#00f3ff';
+                        ctx.shadowBlur = 15;
+                        ctx.shadowColor = '#00f3ff';
+                        ctx.beginPath();
+                        ctx.moveTo(-8, p.radius - 4);
+                        ctx.lineTo(0, p.radius + flameHeight);
+                        ctx.lineTo(8, p.radius - 4);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // ตัวถังยานอวกาศนีออน
+                        ctx.shadowBlur = 18;
+                        ctx.shadowColor = '#00f3ff';
+                        ctx.strokeStyle = '#00f3ff';
+                        ctx.lineWidth = 3;
+                        ctx.fillStyle = '#071226';
+
+                        ctx.beginPath();
+                        ctx.moveTo(0, -p.radius);
+                        ctx.lineTo(p.radius, p.radius);
+                        ctx.lineTo(0, p.radius * 0.6);
+                        ctx.lineTo(-p.radius, p.radius);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+
+                        // ห้องนักบินเรืองแสง
+                        ctx.fillStyle = '#ff007f';
+                        ctx.beginPath();
+                        ctx.arc(0, 2, 5, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // วาดโล่พลังงานหากเปิดใช้งาน
+                        if (p.shield) {
+                            ctx.strokeStyle = '#00ff88';
+                            ctx.shadowColor = '#00ff88';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, p.radius + 10, 0, Math.PI * 2);
+                            ctx.stroke();
+                        }
+
+                        ctx.restore();
+                    }
+                }
+
+                // วาดอนุภาคระเบิด
+                this.particles.forEach(pt => {
+                    ctx.save();
+                    ctx.globalAlpha = Math.max(0, pt.life);
+                    ctx.fillStyle = pt.color;
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = pt.color;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                ctx.restore();
+            }
+
+            loop(timestamp) {
+                const dt = Math.min(0.05, (timestamp - this.lastTime) / 1000);
+                this.lastTime = timestamp;
+
+                this.update(dt);
+                this.draw();
+
+                requestAnimationFrame((t) => this.loop(t));
+            }
+        }
+
+        // เริ่มต้นเกมเมื่อโหลดหน้าเว็บเสร็จสมบูรณ์
+        window.onload = () => {
+            new SpaceShooterGame();
+        };
+    </script>
+</body>
+</html>
